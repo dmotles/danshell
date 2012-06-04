@@ -7,11 +7,8 @@ LD=gcc
 CFLAGS=-ggdb -Wall -lfl
 LDFLAGS=-ggdb -Wall -lfl
 
-myshell: lex.yy.c myshell.c
-	gcc -Wall -ggdb myshell.c -o myshell -lreadline -ltermcap
+danshell: danshell.c
+	gcc -Wall -ggdb danshell.c -o danshell -lreadline -ltermcap
 	
-crapshell: lex.yy.c crapshell.c
-	gcc crapshell.c lex.yy.c -o cshell -lfl
-
 clean:
 	rm -f *.o *.exe *.stackdump

@@ -1,3 +1,13 @@
+
+/*-----------------------------------------------------------------------------
+ *  DANSHELL - a simple linux command shell
+ *  Author: Daniel Motles
+ *  email: dmm141@pitt.edu
+ *  class: cs1550 summer 2012
+ *  project: 1
+ *
+ *  ALL RIGHTS RESERVERD (C) DAN MOTLES
+ *-----------------------------------------------------------------------------*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -54,6 +64,9 @@ const int STDOUT = 1;
 const int STDIN = 0;
 char* PROG_NAME;
 
+/**
+ * Program execution starts here
+ */
 int main( int argc, char** argv) {
   int i = 0;
   char* line = "";
@@ -74,7 +87,12 @@ int main( int argc, char** argv) {
   return 0;
 }
 
-
+/**
+ * Evaluates a tokenized command line to ensure that the operators are being
+ * used properly.
+ *
+ * @param cmdline the tokenized command line.
+ */
 int is_valid( char** cmdline ) {
   int i;
   int ret = 1;
@@ -109,6 +127,13 @@ int is_valid( char** cmdline ) {
   return ret;
 }
 
+/**
+ * Allows you to add PID's to watch. In order to block and flush all added
+ * waits from my_wait's pid queue, call my_wait(0).
+ *
+ * @param pid - either a process id to add to the wait queue or 0 to block
+ *              for all pids and flush the queue
+ */
 void my_wait( int pid ) {
   static Node* pidlist = NULL;
   Node* newnode;
@@ -140,7 +165,14 @@ void my_wait( int pid ) {
 } /* end function */
 
 
-
+/**
+ * Removes an item from the array list. Will close gaps and
+ * free memory associated with the item being freed.
+ *
+ * @param array the string array
+ * @param item the address of the item to be freed
+ * @return the item's address if it was removed successfully or NULL for failure.
+ */
 char* array_remove( char** array, char* item) {
   char** ptr = array;
   char** prev;
@@ -168,6 +200,12 @@ char* array_remove( char** array, char* item) {
 }
 
 
+/**
+ * Does the grunt work of evaluating the tokenized command line and setting up
+ * an execution path/ opening files/ handling pipes.
+ *
+ * @param cmdline the tokenized commandline
+ */
 void evaluate( char** cmdline ) {
   int i,j,k;
   int* out_target = &STDOUT;
@@ -266,6 +304,11 @@ void evaluate( char** cmdline ) {
 }
 
 
+/**
+ * Frees all memory used by the tokenized command line.
+ *
+ * @param arr the string array to free
+ */
 void free_tokenized( char** arr ) {
   int i = 0;
   while( arr[i] != NULL ) {
@@ -282,6 +325,15 @@ void free_tokenized( char** arr ) {
   free( arr );
 }
 
+
+/**
+ * Parses a single string and tokenizes it based on white space
+ * except for enclosing quotes. Returns a string array that must
+ * be freed.
+ *
+ * @param string the command line string to parse
+ * @return a new tokenized command line
+ */
 char** create_tokenized( char* string ) {
   char** tokenarray = (char**)malloc( 5 * sizeof(char**) );
   char* start = string;
@@ -352,6 +404,15 @@ char** create_tokenized( char* string ) {
   return tokenarray;
 }
 
+/**
+ * Given a string and a quote character, find the closing 
+ * quote character UNLESS the quote character is preceeded
+ * by an escape slash \.
+ *
+ * @param c the character which is the quote character.
+ * @param cur the current position in the string we are searching from
+ * @return the matching quote char's position or end of string.
+ */
 char* find_quote_end( char c, char* cur ) {
   cur++;
   int found = 0;
@@ -372,6 +433,20 @@ char* find_quote_end( char c, char* cur ) {
   return cur;
 }
 
+/**
+ * Add a string to the string array, growing if need be. Since this is
+ * being pulled from an existing string without a null terminator, you
+ * must specify start and end addresses within the string. You must
+ * also pass in a pointer to the length of the array so that it can be
+ * grown if it is getting too full.
+ *
+ * This also will convert escaped quote sequences to just quotes.
+ *
+ * @param toks the string array
+ * @param saddr string's starting address
+ * @param eaddr string's ending address
+ * @param len address to array length variable.
+ */
 char** array_add_strn( char** toks, char* saddr, char* eaddr, int* len ) {
   int pos = 0;
   char** array = toks;
@@ -431,6 +506,14 @@ char** array_add_strn( char** toks, char* saddr, char* eaddr, int* len ) {
   return toks;
 }
 
+
+/**
+ * Doubles the size of an array using realloc. Must pass in size to get new size.
+ *
+ * @param arr array address
+ * @param size the address to the size var
+ * @return the address of the re-sized array. It may have changed with realloc.
+ */
 char** grow_array( char** arr, int* size ) {
   char** new = (char**)realloc( arr, (*size * 2) * sizeof(char**) );
   *size = *size * 2;
