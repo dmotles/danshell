@@ -9,9 +9,10 @@
 #include <errno.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <pwd.h>
 
 
-#define DEBUG
+//#define DEBUG
 
 #define PROMPT "danshell$ "
 
@@ -33,74 +34,251 @@ char** create_tokenized( char* string );
 void free_tokenized( char** tokenized );
 char* find_quote_end( char c, char* cur );
 char** array_add_strn( char** arr, char* saddr, char* eaddr, int* size );
+char* array_remove( char** array, char* item );
 char** grow_array( char** arr, int* size );
+int is_valid( char** cmdline );
+void evaluate( char** cmdline );
 int execute( char** cmdargs, int in_fd, int* out_fd );
+void my_wait( int pid );
 int my_exit( char** line, int pos );
 int is_numeric( char* str );
 
 struct node {
-  char* str;
+  int pid;
+  int status;
   struct node* next;
 };
 typedef struct node Node;
 
 const int STDOUT = 1;
 const int STDIN = 0;
+char* PROG_NAME;
 
 int main( int argc, char** argv) {
-  /*
-     int i = 0;
-     char* line = "";
-     char* token;
-     Node list = NULL;
-     while( line ) {
-     line = rl_gets();
-     while ( token = next_token( line ) ) {
-     printf("[%s] ", token);
-     }
-     printf("\n");
-     }
-     return 0;
-     */
   int i = 0;
-  int size = 2;
-  char** array = (char**)malloc( size * sizeof(char**) );
-  array[0] = NULL;
-  char* w1 = "test";
-  char* w2 = "tes\\\"t2";
-  char* w3 = "t\\'es t3\\'";
-  char* w4 = "'test4'";
-  char* w5 = "\"THIS IS A REALLY \\\"LONG\\\" STRING LUL\" AND I DON'T WANT TO SEE THIS SHIT";
-  array = array_add_strn( array, w1, w1+strlen(w1), &size );
-  printf( "cur size: %d\n", size);
-  array = array_add_strn( array, w2, w2+strlen(w2), &size );
-  printf( "cur size: %d\n", size);
-  array = array_add_strn( array, w3, w3+strlen(w3), &size );
-  printf( "cur size: %d\n", size);
-  array = array_add_strn( array, w4, w4+strlen(w4), &size );
-  printf( "cur size: %d\n", size);
-  array = array_add_strn( array, w5, find_quote_end( '"', w5 ), &size );
-  printf( "cur size: %d\n", size);
+  char* line = "";
+  char** tokens;
+  PROG_NAME = argv[0];
+  while( ( line = rl_gets() ) != NULL ) {
+    tokens = create_tokenized( line );
+#ifdef DEBUG
+    for( i = 0; tokens[i] != NULL; i++ ) {
+      printf("[ %s ] ", tokens[i] );
+    }
+    printf("\n");
+#endif
+    evaluate( tokens );
+    free_tokenized( tokens );
+  }
+  printf("\n");
+  return 0;
+}
 
-  for( i = 0 ; array[i] != NULL; i++ ) {
-    printf("%x, %s\n", array[i], array[i]);
+
+int is_valid( char** cmdline ) {
+  int i;
+  int ret = 1;
+  int error = 0;
+  char* errorstr;
+  /* cmd line validation */
+  for( i = 0 ; !error && cmdline[i] != NULL; i++ ) {
+    if( i == 0 ) {
+      if( strcmp( cmdline[i], "|" ) == 0 ) {
+        error = 1; 
+        errorstr = "Pipes must be preceeded by something.";
+      } else if( strcmp( cmdline[i], ">" ) == 0 ) {
+        error = 1; 
+        errorstr = "redirects must be preceeded by something.";
+      }
+    } else if( cmdline[i+1] == NULL ) {
+      if( strcmp( cmdline[i], "|" ) == 0 ) {
+        error = 1;
+        errorstr = "Pipes must be followed by something.";
+      } else if( strcmp( cmdline[i], ">" ) == 0 ) {
+        error = 1; 
+        errorstr = "redirects must be followed by something.";
+      }
+    }
   }
 
+  if( error ) {
+     fprintf( stderr, "%s: %s\n", PROG_NAME, errorstr ); 
+     ret = 0;
+  }
 
-  free_tokenized( array );
-  return 0;
-
+  return ret;
 }
+
+void my_wait( int pid ) {
+  static Node* pidlist = NULL;
+  Node* newnode;
+  Node* ptr = pidlist;
+  Node* prev = pidlist;
+  if( pid == 0 ) {
+    while( ptr != NULL ) {
+      prev = ptr;
+      waitpid( ptr->pid, &(ptr->status), 0 );
+      ptr = ptr->next;
+      free(prev);
+    }
+    pidlist = NULL;
+  } else {
+    newnode = (Node*)malloc( sizeof(Node) );
+    newnode->pid = pid;
+    newnode->next = NULL;
+    if( pidlist == NULL ) {
+      pidlist = newnode;
+    } else {
+      while( ptr != NULL ) {
+        prev = ptr;
+        ptr = ptr->next;
+      }
+      prev->next = newnode;
+    } /* end if( pidlist == null ) */
+  } /* end if( pid == 0) */
+  
+} /* end function */
+
+
+
+char* array_remove( char** array, char* item) {
+  char** ptr = array;
+  char** prev;
+  char* ret = item;
+  while( *ptr != item && *ptr != NULL ) {
+    ptr++;
+  }
+
+  if( *ptr != NULL ) {
+    free( *ptr );
+    while( *ptr != NULL ) {
+      prev = ptr;
+      ptr++;
+      //if( *ptr != NULL ) {
+        *prev = *ptr;
+      //} else {
+      //  *prev = NULL;
+      //}
+    }
+  } else {
+    ret = NULL;
+  }
+  
+  return ret;
+}
+
+
+void evaluate( char** cmdline ) {
+  int i,j,k;
+  int* out_target = &STDOUT;
+  int in_target = STDIN;
+  int filefd;
+  int file_open = 0;
+  char** cmdstring;
+
+  if( !is_valid( cmdline ) ) {
+    return;
+  }
+
+  /* start parsing commands */
+  for( i = 0; cmdline[i] != NULL; i++ ) {
+    if( file_open ) {
+      in_target = filefd;
+      file_open = 0;
+    }
+
+    /* go until special operator or NULL */
+    for( j = i; cmdline[j] != NULL; j++ ) {
+#ifdef DEBUG
+      printf( "i:%d j:%d cmdline[j]:%s\n", i, j, cmdline[j]);
+#endif
+
+      /* pipe */
+      if( strcmp( cmdline[j], "|" ) == 0 ) {
+        if( ! file_open ) {
+          out_target = NULL;
+        }
+        break;
+      }
+
+      /* redirect */
+      if( strcmp( cmdline[j], ">" ) == 0 && ! file_open ) {
+        filefd = open( 
+            cmdline[j+1], 
+            O_WRONLY | O_CREAT | O_TRUNC, 
+            S_IRUSR | S_IWUSR | S_IRGRP | S_IRGRP
+            );
+        
+        if( filefd < 0 ) { /* file open error */
+          fprintf( stderr, "%s: opening of %s failed: %s\n", 
+              PROG_NAME,
+              cmdline[j+1],
+              strerror( errno ) );
+          if( i > 0 ) { /* we need to cleanup for potentially other running programs */
+            my_wait( 0 );
+            if( in_target != STDIN ) {
+              close( in_target );
+            }
+          }
+          return;
+        } else { /* file opened fine */
+          out_target = &filefd;
+          array_remove( cmdline, cmdline[j] );
+          array_remove( cmdline, cmdline[j] );
+          j--;
+          file_open = 1;
+        } /* end if( i < 0 ) */
+      } /* end redirect op check */
+
+    } /* end inner for loop */
+
+    if( !file_open && cmdline[j] == NULL ) { /* end of line == stdout */
+      out_target = &STDOUT;
+    }
+
+    cmdstring = (char**)malloc( ((j-i)+1) * sizeof(char**) );
+
+    for( k = 0 ; i < j ; i++, k++ ) {
+      cmdstring[k] = cmdline[i];
+    }
+    cmdstring[k] = NULL;
+
+    in_target = execute( cmdstring, in_target, out_target );
+    free( cmdstring );
+
+    if( in_target < 0 ) { /* there was some sort of problem, ABORT MISSION */
+      if( i > 0 ) {
+        my_wait( 0 ); /* make sure children are DEAD */
+      }
+      return;
+    } /* end if( in_target < 0 ) */
+
+    
+    if( cmdline[i] == NULL ) { 
+      /* since for loop will increment, 
+       * don't want to miss end of array */
+      i--;
+    }
+
+  } /* end outer for loop */
+
+  my_wait( 0 );
+}
+
 
 void free_tokenized( char** arr ) {
   int i = 0;
   while( arr[i] != NULL ) {
+#ifdef DEBUG
     printf(" freeing %x \n", arr[i] );
+#endif
     free( arr[i] );
     i++;
   }
 
+#ifdef DEBUG
   printf("FINALLY freeing %x \n", arr );
+#endif
   free( arr );
 }
 
@@ -164,6 +342,12 @@ char** create_tokenized( char* string ) {
       } /* end switch */
     } /* end while */
 
+
+    if( token_found ) {
+      tokenarray = array_add_strn( tokenarray, start, end, &len);
+    }
+
+
   } /* end if */
   return tokenarray;
 }
@@ -210,8 +394,10 @@ char** array_add_strn( char** toks, char* saddr, char* eaddr, int* len ) {
     pos++;
     array++;
   }
-  
+
+#ifdef DEBUG
   printf( "allocating %d for string\n", (eaddr-saddr)+1 );
+#endif 
   *array = malloc( ( (eaddr - saddr) + 1 ) * sizeof(char) );
 
   while( saddr != eaddr ) {
@@ -302,10 +488,34 @@ char* rl_gets() {
  */
 int execute( char** cmdargs, int in_fd, int* out_fd ) {
   pid_t pid;
-  int i;              
   int fd[2];    /* a file descriptor pipe to send/recieve data on */
   int writefd;  /* the FD we will write to (if not stdout) */
   int ret = 0;
+  char* cd_target;
+  struct passwd* pw;
+  
+  if( strcmp( cmdargs[0] , "exit" ) == 0 ) {
+    my_exit( cmdargs, 0);
+  } else if( strcmp( cmdargs[0] , "cd" ) == 0 ) {
+    if ( cmdargs[1] == NULL ) {
+      pw = getpwuid( getuid() );
+      cd_target = pw->pw_dir;
+    } else {
+      cd_target = cmdargs[1];
+    }
+    if( ( ret = chdir( cmdargs[1] ) ) < 0 ) {
+        fprintf( 
+            stderr, 
+            "%s: unable to cd to %s: %s\n", 
+            PROG_NAME,
+            cd_target,
+            strerror( errno ) 
+            );
+    } else {
+      printf("cwd: %s\n", cd_target);
+    }
+    return 0;
+  }
 
   if( out_fd == NULL ) {  /* We need to return a readable FD to caller */
     if( pipe( fd ) < 0 ) {
@@ -332,7 +542,8 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
       if( dup2( in_fd, STDIN ) < 0 ) { /* make stdin point to in_fd */
         fprintf( 
             stderr, 
-            "Unable to make stdin point to %d: %s\n", 
+            "%s: Unable to make stdin point to %d: %s\n", 
+            PROG_NAME,
             in_fd,
             strerror( errno ) );
       }
@@ -351,9 +562,11 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
       if( dup2( writefd, STDOUT ) < 0 ) { /* make stdout point to writefd */
         fprintf( 
             stderr, 
-            "Unable to make stdout point to %d: %s\n", 
+            "%s: Unable to make stdout point to %d: %s\n", 
+            PROG_NAME,
             in_fd,
-            strerror( errno ) );
+            strerror( errno ) 
+            );
       }
 
       close( writefd );
@@ -361,7 +574,15 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
 
 
     if( execvp( cmdargs[0], cmdargs ) < 0 ) {
-      fprintf( stderr, "Unable to execute %s: %s\n", cmdargs[0], strerror(errno));
+
+      fprintf( 
+          stderr, 
+          "%s: Unable to execute %s: %s\n", 
+          PROG_NAME, 
+          cmdargs[0], 
+          strerror(errno)
+          );
+
       exit( EXIT_FAILURE );
     }
 
@@ -373,6 +594,8 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
       perror("Fork fatal error");
       exit( EXIT_FORK_ERROR );
     }
+    
+    my_wait( pid );
   }
 
   if( out_fd == NULL ) {
