@@ -1,10 +1,7 @@
-
 /*-----------------------------------------------------------------------------
  *  DANSHELL - a simple linux command shell
  *  Author: Daniel Motles
- *  email: dmm141@pitt.edu
- *  class: cs1550 summer 2012
- *  project: 1
+ *  email: seltom.dan@gmail.com
  *
  *  ALL RIGHTS RESERVERD (C) DAN MOTLES
  *-----------------------------------------------------------------------------*/
@@ -102,10 +99,10 @@ int is_valid( char** cmdline ) {
   for( i = 0 ; !error && cmdline[i] != NULL; i++ ) {
     if( i == 0 ) {
       if( strcmp( cmdline[i], "|" ) == 0 ) {
-        error = 1; 
+        error = 1;
         errorstr = "Pipes must be preceeded by something.";
       } else if( strcmp( cmdline[i], ">" ) == 0 ) {
-        error = 1; 
+        error = 1;
         errorstr = "redirects must be preceeded by something.";
       }
     } else if( cmdline[i+1] == NULL ) {
@@ -113,14 +110,14 @@ int is_valid( char** cmdline ) {
         error = 1;
         errorstr = "Pipes must be followed by something.";
       } else if( strcmp( cmdline[i], ">" ) == 0 ) {
-        error = 1; 
+        error = 1;
         errorstr = "redirects must be followed by something.";
       }
     }
   }
 
   if( error ) {
-     fprintf( stderr, "%s: %s\n", PROG_NAME, errorstr ); 
+     fprintf( stderr, "%s: %s\n", PROG_NAME, errorstr );
      ret = 0;
   }
 
@@ -161,7 +158,7 @@ void my_wait( int pid ) {
       prev->next = newnode;
     } /* end if( pidlist == null ) */
   } /* end if( pid == 0) */
-  
+
 } /* end function */
 
 
@@ -195,7 +192,7 @@ char* array_remove( char** array, char* item) {
   } else {
     ret = NULL;
   }
-  
+
   return ret;
 }
 
@@ -241,14 +238,14 @@ void evaluate( char** cmdline ) {
 
       /* redirect */
       if( strcmp( cmdline[j], ">" ) == 0 && ! file_open ) {
-        filefd = open( 
-            cmdline[j+1], 
-            O_WRONLY | O_CREAT | O_TRUNC, 
+        filefd = open(
+            cmdline[j+1],
+            O_WRONLY | O_CREAT | O_TRUNC,
             S_IRUSR | S_IWUSR | S_IRGRP | S_IRGRP
             );
-        
+
         if( filefd < 0 ) { /* file open error */
-          fprintf( stderr, "%s: opening of %s failed: %s\n", 
+          fprintf( stderr, "%s: opening of %s failed: %s\n",
               PROG_NAME,
               cmdline[j+1],
               strerror( errno ) );
@@ -291,9 +288,9 @@ void evaluate( char** cmdline ) {
       return;
     } /* end if( in_target < 0 ) */
 
-    
-    if( cmdline[i] == NULL ) { 
-      /* since for loop will increment, 
+
+    if( cmdline[i] == NULL ) {
+      /* since for loop will increment,
        * don't want to miss end of array */
       i--;
     }
@@ -405,7 +402,7 @@ char** create_tokenized( char* string ) {
 }
 
 /**
- * Given a string and a quote character, find the closing 
+ * Given a string and a quote character, find the closing
  * quote character UNLESS the quote character is preceeded
  * by an escape slash \.
  *
@@ -472,7 +469,7 @@ char** array_add_strn( char** toks, char* saddr, char* eaddr, int* len ) {
 
 #ifdef DEBUG
   printf( "allocating %d for string\n", (eaddr-saddr)+1 );
-#endif 
+#endif
   *array = malloc( ( (eaddr - saddr) + 1 ) * sizeof(char) );
 
   while( saddr != eaddr ) {
@@ -576,7 +573,7 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
   int ret = 0;
   char* cd_target;
   struct passwd* pw;
-  
+
   if( strcmp( cmdargs[0] , "exit" ) == 0 ) {
     my_exit( cmdargs, 0);
   } else if( strcmp( cmdargs[0] , "cd" ) == 0 ) {
@@ -587,12 +584,12 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
       cd_target = cmdargs[1];
     }
     if( ( ret = chdir( cmdargs[1] ) ) < 0 ) {
-        fprintf( 
-            stderr, 
-            "%s: unable to cd to %s: %s\n", 
+        fprintf(
+            stderr,
+            "%s: unable to cd to %s: %s\n",
             PROG_NAME,
             cd_target,
-            strerror( errno ) 
+            strerror( errno )
             );
     } else {
       printf("cwd: %s\n", cd_target);
@@ -623,9 +620,9 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
     /* Setup where program is reading from if not stdin */
     if( in_fd != STDIN ) {
       if( dup2( in_fd, STDIN ) < 0 ) { /* make stdin point to in_fd */
-        fprintf( 
-            stderr, 
-            "%s: Unable to make stdin point to %d: %s\n", 
+        fprintf(
+            stderr,
+            "%s: Unable to make stdin point to %d: %s\n",
             PROG_NAME,
             in_fd,
             strerror( errno ) );
@@ -643,12 +640,12 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
         close( fd[0] ); /* don't need read end of pipe */
 
       if( dup2( writefd, STDOUT ) < 0 ) { /* make stdout point to writefd */
-        fprintf( 
-            stderr, 
-            "%s: Unable to make stdout point to %d: %s\n", 
+        fprintf(
+            stderr,
+            "%s: Unable to make stdout point to %d: %s\n",
             PROG_NAME,
             in_fd,
-            strerror( errno ) 
+            strerror( errno )
             );
       }
 
@@ -658,11 +655,11 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
 
     if( execvp( cmdargs[0], cmdargs ) < 0 ) {
 
-      fprintf( 
-          stderr, 
-          "%s: Unable to execute %s: %s\n", 
-          PROG_NAME, 
-          cmdargs[0], 
+      fprintf(
+          stderr,
+          "%s: Unable to execute %s: %s\n",
+          PROG_NAME,
+          cmdargs[0],
           strerror(errno)
           );
 
@@ -677,7 +674,7 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
       perror("Fork fatal error");
       exit( EXIT_FORK_ERROR );
     }
-    
+
     my_wait( pid );
   }
 
@@ -686,7 +683,7 @@ int execute( char** cmdargs, int in_fd, int* out_fd ) {
     ret = fd[0]; /* ret is the fd to read from for prog output */
   }
 
-  if( in_fd != STDIN ) 
+  if( in_fd != STDIN )
     close( in_fd );
 
   return ret; // return the file descriptor which contains this program's output.
@@ -714,7 +711,7 @@ int my_exit( char** line, int pos ) {
 
 /**
  * Tests if string is numeric
- * 
+ *
  * @param str string
  * @return 0 if false, 1 if true
  */

@@ -1,0 +1,11 @@
+# A basic shell in C
+Supports gnu readline, pipes, stdout redirection. the tokenizer also allows for strings to group arguments.
+
+## Build
+Just run "make" inside the directory.
+
+## Execute
+
+    ./danshell 
+
+Use like you would use a normal shell, minus all the fancy features :(
